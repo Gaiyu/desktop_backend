@@ -15,7 +15,7 @@ app = Sanic(__name__)
 	#return empty(status = 403)
 
 def help():
-	print(__file__ + ' -d /xx/xx -w /xx/xx')
+	print(__file__ + ' -d <初始NAS共享根目录> -w <前端页面dist目录>')
 	sys.exit()
 
 def main(argv):

@@ -6,15 +6,14 @@ from sanic.log import logger
 from sanic.response import file
 
 BP = Blueprint(__name__, url_prefix="/")
-root_dir = '/app/'
+root_dir = '/app/dist/'
 
-DIST_DIR = '/dist/'
-JS_DIR = DIST_DIR + 'js/'
-IMG_DIR = DIST_DIR + 'img/'
-CSS_DIR = DIST_DIR + 'css/'
-FONTS_DIR = DIST_DIR + 'fonts/'
-INDEX_HTML = DIST_DIR + 'index.html'
-FAVICON = DIST_DIR + 'favicon.ico'
+JS_DIR = '/js/'
+IMG_DIR = '/img/'
+CSS_DIR = '/css/'
+FONTS_DIR = '/fonts/'
+INDEX_HTML = '/index.html'
+FAVICON = '/favicon.ico'
 
 def get_root_dir():
 	global root_dir
