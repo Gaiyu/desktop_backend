@@ -7,6 +7,7 @@ from sanic.response import empty
 import static.static_server as StaticServer
 import file_browser.file_browser as FileBrowser
 import session.login as Login
+import desktop.api as Desktop
 
 app = Sanic(__name__)
 
@@ -38,6 +39,7 @@ def main(argv):
 	app.blueprint(StaticServer.BP)
 	app.blueprint(FileBrowser.BP)
 	app.blueprint(Login.BP)
+	app.blueprint(Desktop.BP)
 	app.run(debug = debug, access_log = debug, host="0.0.0.0", port=8000)
 
 if __name__ == "__main__":
