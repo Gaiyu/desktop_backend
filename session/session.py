@@ -79,7 +79,7 @@ class Session:
 		if None != self.aes_key:
 			return self.aes_key.decrypt(text)
 		return None
-		
+
 	def logined(self):
 		return None != self.aes_passwd
 
@@ -90,5 +90,10 @@ class Session:
 		return self.aes_passwd
 
 	def logout(self):
-		del Session.active[self.id]
-		del self
+		self.bomb.cancel()
+		if None != Session.get(self.id):
+			del Session.active[self.id]
+			del self.rsa_key
+			del self.aes_key
+			self.rsa_key = None
+			self.aes_key = None

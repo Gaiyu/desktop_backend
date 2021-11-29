@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
-from sanic.response import text
-from sanic.response import json
+from session.session import Session
 from sanic.log import logger
 from sanic import Blueprint
+import sanic.response as response
 import pyinotify
 import asyncio
 import shutil
@@ -44,7 +44,8 @@ class DirObserver:
 			asyncio.run(self.ob.send(self.ob.ls()))
 			logger.debug(__name__ + " MV[E]: " + event.pathname)
 
-	def __init__(self, ws, pwd):
+	def __init__(self, ws, pwd, session_id):
+		self.session = Session.get(session_id)
 		self.ws = ws
 		self.hd = DirObserver.EventHandler(self)
 		self.wm = pyinotify.WatchManager()
@@ -60,8 +61,12 @@ class DirObserver:
 		del self.wm
 		del self.hd
 
+	def good():
+		return ((None != self.session) and self.session.good())
+
 	def send(self, msg):
-		self.ws.wend(msg)
+		if None != self.session:
+			self.ws.wend(self.session.encrypt(msg))
 
 	def file_size(self, byte):
 		KB = byte / 1024
@@ -149,58 +154,68 @@ class DirObserver:
 
 		return self.json_response(True, 'ls', data)
 
+	async def serve(self):
+		if not self.good():
+			return
+		await self.send(ob.ls())
+		while self.session.good():
+			try:
+				data = await asyncio.wait_for(self.ws.recv(), timeout=1.0)
+				logger.debug(__name__ + " Received: " + data)
+				if not data.strip():
+					continue
+
+				try:
+					cmd = json.loads(data)
+				except json.decoder.JSONDecodeError:
+					continue
+
+				sn = self.session.decrypt(cmd['sn'])
+				if not session.check(sn["token"], sn["number"]):
+					continue
+
+				op = self.session.decrypt(cmd['args'][0])
+				if 'ls' == op:
+					await self.send(ob.ls())
+				elif 'op' == op:
+					await self.send(ob.op(self.session.decrypt(cmd['args'][1])))
+				elif 'dl' == op:
+					await self.send(ob.dl(self.session.decrypt(cmd['args'][1])))
+				elif 'rm' == op:
+					ob.rm(self.session.decrypt(cmd['args'][1]))
+				elif 'md' == op:
+					ob.md(self.session.decrypt(cmd['args'][1]))
+				elif 'mv' == op:
+					ob.mv(self.session.decrypt(cmd['args'][1]), self.session.decrypt(cmd['args'][2]))
+				elif 'cp' == op:
+					ob.cp(self.session.decrypt(cmd['args'][1]), self.session.decrypt(cmd['args'][2]))
+				elif 'xx' == op:
+					break
+
+			except asyncio.TimeoutError:
+				continue
+			except Exception as e:
+				logger.debug(ob.json_response(False, op, str(e), e.errno))
+				continue
+
 '''
 request: {
-	"op" : ..
+	"sn" : ..
 	"args" : [..]
 }
 
-op : ls, rm, mv, md(mkdir), op(open), dl(download), cp, cpf
+args[0] : ls, rm, mv, md(mkdir), op(open), dl(download), cp, cpf
 '''
-@BP.websocket("/")
-async def browse_handle(request, ws):
-	ob = DirObserver(ws, root_dir)
-	await ws.send(ob.ls())
-	while True:
-		try:
-			data = await asyncio.wait_for(ws.recv(), timeout=1.0)
-			logger.debug(__name__ + " Received: " + data)
-			if not data.strip():
-				continue
-
-			try:
-				cmd = json.loads(data)
-			except json.decoder.JSONDecodeError:
-				await ws.send(ob.json_response(False, None, 'the request must be in json format', DirObserver.ERRNO_json_decode))
-				continue
-
-			op = cmd['op']
-			if 'ls' == op:
-				await ws.send(ob.ls())
-			elif 'op' == op:
-				await ws.send(ob.op(cmd['args'][0]))
-			elif 'dl' == op:
-				await ws.send(ob.dl(cmd['args'][0]))
-			elif 'rm' == op:
-				ob.rm(cmd['args'][0])
-			elif 'md' == op:
-				ob.md(cmd['args'][0])
-			elif 'mv' == op:
-				ob.mv(cmd['args'][0], cmd['args'][1])
-			elif 'cp' == op:
-				ob.cp(cmd['args'][0], cmd['args'][1])
-
-		except asyncio.TimeoutError:
-			continue
-		except Exception as e:
-			await ws.send(ob.json_response(False, op, str(e), e.errno))
-			continue
+@BP.websocket("/<session_id>")
+async def browse_handle(request, ws, session_id):
+	ob = DirObserver(ws, root_dir, session_id)
+	ob.serve()
 	del ob
 
-@BP.post("/op")
+@BP.post("/<session_id>/op/<cmd_id>")
 async def open_handle(request):
 	pass
 
-@BP.post("/dl")
+@BP.post("/<session_id>/dl/<cmd_id>")
 async def download_handle(request):
 	pass

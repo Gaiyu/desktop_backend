@@ -5,9 +5,9 @@ import getopt
 from sanic import Sanic
 from sanic.response import empty
 import static.static_server as StaticServer
-import file_browser.file_browser as FileBrowser
 import session.login as Login
 import desktop.api as Desktop
+import file_browser.api as FileBrowser
 
 app = Sanic(__name__)
 
